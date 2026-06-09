@@ -18,7 +18,12 @@
           pkgs.nodejs_24
           pkgs.nodePackages.pnpm
           pkgs.nodePackages.typescript-language-server
+          pkgs.luajit
+          pkgs.go
         ];
+        shellHook = ''
+          export LIBRARY_PATH="${pkgs.luajit}/lib:$LIBRARY_PATH"
+        '';
       };
     });
   };
