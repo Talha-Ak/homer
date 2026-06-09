@@ -35,6 +35,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { getMergedFields, useMappings } from '@/hooks/useMappings'
+import { useNodeAliasOptions } from '@/hooks/useNodeAliasOptions'
 import { buildSearchDeepLinkURL } from '../searchDeepLink'
 
 const METHOD_OPTIONS = [
@@ -218,6 +219,7 @@ export default function SearchPanel({ config, onConfigChange, widgetId }) {
   const [limitDraft, setLimitDraft] = useState<string | null>(null)
 
   const { mappings, loading: mappingsLoading } = useMappings()
+  const { options: nodeAliasOptions, loading: nodeAliasOptionsLoading } = useNodeAliasOptions()
 
   useEffect(() => {
     setLimitDraft(null)
@@ -471,7 +473,12 @@ export default function SearchPanel({ config, onConfigChange, widgetId }) {
       if (Number(form.src_port) > 0) filter.src_port = Number(form.src_port)
       if (Number(form.dst_port) > 0) filter.dst_port = Number(form.dst_port)
       if (Number(form.capture_id) > 0) filter.capture_id = Number(form.capture_id)
-      if (form.node) filter.node = form.node
+      if (Array.isArray(form.node)) {
+        if (form.node.length === 1) filter.node = form.node[0]
+        else if (form.node.length > 1) filter.nodes = form.node
+      } else if (form.node) {
+        filter.node = form.node
+      }
     }
 
     const searchData = {
@@ -513,6 +520,7 @@ export default function SearchPanel({ config, onConfigChange, widgetId }) {
         method: Array.isArray(form.method) ? form.method[0] : form.method,
         src_ip: form.src_ip,
         dst_ip: form.dst_ip,
+        node: Array.isArray(form.node) ? form.node.join(',') : form.node || form.node_id,
         proto_type: form.proto_type,
         event_type: form.event_type,
         limit,
@@ -569,10 +577,45 @@ export default function SearchPanel({ config, onConfigChange, widgetId }) {
     </div>
   )
 
+  const nodeSelectField = (id = 'node', label = 'Node') => {
+    if (!nodeAliasOptionsLoading && nodeAliasOptions.length === 0) {
+      return textField(id, label, 'text', 'Node ID')
+    }
+
+    const selected = Array.isArray(form[id])
+      ? form[id]
+      : form[id]
+        ? String(form[id]).split(',').map((value) => value.trim()).filter(Boolean)
+        : []
+    const knownValues = new Set(nodeAliasOptions.map((option) => option.value))
+    const options = [
+      ...selected
+        .filter((value) => !knownValues.has(value))
+        .map((value) => ({ value, name: value })),
+      ...nodeAliasOptions.map((option) => ({ value: option.value, name: option.label })),
+    ]
+
+    return (
+      <div className="grid gap-1" key={id}>
+        <Label className="text-[11px] text-muted-foreground">{label}</Label>
+        <MultiSelectInput
+          id={`sp-${id}`}
+          options={options}
+          value={selected}
+          onChange={(values) => handleChange(id, values)}
+          placeholder={nodeAliasOptionsLoading ? 'Loading HEP subscriptions…' : 'Any'}
+        />
+      </div>
+    )
+  }
+
   // Render a single dynamic field from fields_mapping metadata
   const renderDynamicField = (field) => {
     const { id, name, form_type, selector, type } = field
     const vMatch = field.virtual?.match != null ? String(field.virtual.match).toLowerCase() : ''
+    if (id === 'node' || id === 'node_id') {
+      return nodeSelectField(id, name || 'Node')
+    }
     if (field.virtual?.kind && (vMatch === 'absent' || vMatch === 'present')) {
       const checked = form[id] === true || form[id] === '1'
       return (
@@ -784,7 +827,7 @@ export default function SearchPanel({ config, onConfigChange, widgetId }) {
                   {textField('dst_port', 'Dst Port', 'number', '5060')}
                   {textField('ruri_user', 'R-URI', 'text', 'R-URI user')}
                   {textField('user_agent', 'UA', 'text', 'User Agent')}
-                  {textField('node', 'Node', 'text', 'Node ID')}
+                  {nodeSelectField('node', 'Node')}
                   <div className="grid gap-1">
                     <Label htmlFor="sp-limit" className="text-[11px] text-muted-foreground">Limit</Label>
                     <Input
