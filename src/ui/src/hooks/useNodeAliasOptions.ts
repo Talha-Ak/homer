@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { apiGet } from '@/api'
 
-interface AliasItem {
-  alias?: string
-  capture_id?: string | number
-  status?: boolean
+interface HepsubItem {
+  hepid?: string | number
+  hep_alias?: string
+  profile?: string
 }
 
 export interface NodeAliasOption {
@@ -12,34 +12,32 @@ export interface NodeAliasOption {
   value: string
 }
 
-interface AliasesResponse {
+interface HepsubsResponse {
   data?: {
-    items?: AliasItem[]
+    items?: HepsubItem[]
   }
 }
 
 let cachedOptions: NodeAliasOption[] | null = null
 let fetchPromise: Promise<NodeAliasOption[]> | null = null
 
-function buildOptions(items: AliasItem[]): NodeAliasOption[] {
-  const byCaptureId = new Map<string, string[]>()
+function buildOptions(items: HepsubItem[]): NodeAliasOption[] {
+  const byHepID = new Map<string, string[]>()
 
   for (const item of items) {
-    if (item.status === false) continue
+    const hepID = String(item.hepid ?? '').trim()
+    if (!hepID) continue
 
-    const captureId = String(item.capture_id ?? '').trim()
-    if (!captureId) continue
-
-    const alias = String(item.alias ?? '').trim()
-    const names = byCaptureId.get(captureId) ?? []
-    if (alias && !names.includes(alias)) names.push(alias)
-    byCaptureId.set(captureId, names)
+    const display = String(item.profile ?? item.hep_alias ?? '').trim()
+    const labels = byHepID.get(hepID) ?? []
+    if (display && !labels.includes(display)) labels.push(display)
+    byHepID.set(hepID, labels)
   }
 
-  return [...byCaptureId.entries()]
-    .map(([captureId, aliases]) => ({
-      value: captureId,
-      label: aliases.length > 0 ? `${aliases.join(', ')} (${captureId})` : captureId,
+  return [...byHepID.entries()]
+    .map(([hepID, labels]) => ({
+      value: hepID,
+      label: labels.length > 0 ? `${labels.join(', ')} (${hepID})` : hepID,
     }))
     .sort((a, b) =>
       a.label.localeCompare(b.label, undefined, {
@@ -50,7 +48,7 @@ function buildOptions(items: AliasItem[]): NodeAliasOption[] {
 }
 
 async function fetchNodeAliasOptions(): Promise<NodeAliasOption[]> {
-  const resp = await apiGet<AliasesResponse>('/aliases', { 'page[limit]': 1000 })
+  const resp = await apiGet<HepsubsResponse>('/hepsubs', { 'page[limit]': 1000 })
   return buildOptions(resp?.data?.items ?? [])
 }
 

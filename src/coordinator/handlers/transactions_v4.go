@@ -215,9 +215,9 @@ type SearchObjectV4 struct {
 	Filter struct {
 		ProtoType     int      `json:"proto_type"`
 		EventType     string   `json:"event_type"`
-		Method        string   `json:"method"` // legacy single value; comma-separated OK; merged with methods
-		Methods       []string `json:"methods,omitempty"` // multi-select + custom methods → SQL IN (...)
-		ResponseCode  string   `json:"response_code,omitempty"` // comma-separated OK; merged with response_codes
+		Method        string   `json:"method"`                   // legacy single value; comma-separated OK; merged with methods
+		Methods       []string `json:"methods,omitempty"`        // multi-select + custom methods → SQL IN (...)
+		ResponseCode  string   `json:"response_code,omitempty"`  // comma-separated OK; merged with response_codes
 		ResponseCodes []string `json:"response_codes,omitempty"` // multi-select + custom codes → SQL IN (...)
 		CallID        string   `json:"call_id"`
 		SessionID     string   `json:"session_id,omitempty"` // alias for call_id (matches DuckLake column name)
@@ -234,15 +234,15 @@ type SearchObjectV4 struct {
 		DstPort       int      `json:"dst_port"`
 		CaptureID     int      `json:"capture_id"`
 		Node          string   `json:"node"`
-		Nodes         []string `json:"nodes,omitempty"`          // multi-select node aliases
-		NodeID        string   `json:"node_id,omitempty"`        // alias for node
-		NodeIDs       []string `json:"node_ids,omitempty"`       // alias for nodes
-		NodeName      string   `json:"node_name,omitempty"`      // HEP 0x0013 in data_extra.node_name
-		Aor           string   `json:"aor,omitempty"`            // SIP registration column
+		Nodes         []string `json:"nodes,omitempty"`       // multi-select node aliases
+		NodeID        string   `json:"node_id,omitempty"`     // alias for node
+		NodeIDs       []string `json:"node_ids,omitempty"`    // alias for nodes
+		NodeName      string   `json:"node_name,omitempty"`   // HEP 0x0013 in data_extra.node_name
+		Aor           string   `json:"aor,omitempty"`         // SIP registration column
 		Contact       string   `json:"contact,omitempty"`     // SIP registration column
 		Expires       string   `json:"expires,omitempty"`     // SIP registration column
 		CseqMethod    string   `json:"cseq_method,omitempty"` // SIP call column cseq_method
-		Payload       string   `json:"payload,omitempty"` // full-text search in payload (LOG)
+		Payload       string   `json:"payload,omitempty"`     // full-text search in payload (LOG)
 		// OTLP metrics (proto_type 201) — Protocol Search form + metric-name picker.
 		Name        string   `json:"name,omitempty"`         // exact metric name (preferred over call_id→name LIKE)
 		Type        string   `json:"type,omitempty"`         // single OTLP metric kind (gauge, sum, …)
