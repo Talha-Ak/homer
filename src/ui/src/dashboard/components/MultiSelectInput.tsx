@@ -27,6 +27,7 @@ export default function MultiSelectInput({
   const [open, setOpen] = useState(false)
   const [customInput, setCustomInput] = useState('')
   const containerRef = useRef<HTMLDivElement>(null)
+  const optionNameByValue = new Map(options.map((opt) => [opt.value, opt.name]))
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -87,7 +88,7 @@ export default function MultiSelectInput({
               key={v}
               className="inline-flex items-center gap-0.5 rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-medium text-primary"
             >
-              {v}
+              {optionNameByValue.get(v) ?? v}
               <X
                 className="h-2.5 w-2.5 cursor-pointer opacity-60 hover:opacity-100"
                 onClick={(e) => remove(v, e)}

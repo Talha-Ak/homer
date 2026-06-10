@@ -145,6 +145,33 @@ func sipFilterResponseValues(code string, codes []string) []string {
 	return out
 }
 
+func searchFilterStringValues(single string, multi ...[]string) []string {
+	seen := make(map[string]struct{})
+	out := make([]string, 0)
+	add := func(s string) {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			return
+		}
+		if _, ok := seen[s]; ok {
+			return
+		}
+		seen[s] = struct{}{}
+		out = append(out, s)
+	}
+	for _, values := range multi {
+		for _, value := range values {
+			add(value)
+		}
+	}
+	if single != "" {
+		for part := range strings.SplitSeq(single, ",") {
+			add(part)
+		}
+	}
+	return out
+}
+
 type TransactionListResponseV4 struct {
 	Data struct {
 		Items []map[string]interface{} `json:"items"`
@@ -207,9 +234,11 @@ type SearchObjectV4 struct {
 		DstPort       int      `json:"dst_port"`
 		CaptureID     int      `json:"capture_id"`
 		Node          string   `json:"node"`
-		NodeID        string   `json:"node_id,omitempty"` // alias for node
-		NodeName      string   `json:"node_name,omitempty"` // HEP 0x0013 in data_extra.node_name
-		Aor           string   `json:"aor,omitempty"`           // SIP registration column
+		Nodes         []string `json:"nodes,omitempty"`          // multi-select node aliases
+		NodeID        string   `json:"node_id,omitempty"`        // alias for node
+		NodeIDs       []string `json:"node_ids,omitempty"`       // alias for nodes
+		NodeName      string   `json:"node_name,omitempty"`      // HEP 0x0013 in data_extra.node_name
+		Aor           string   `json:"aor,omitempty"`            // SIP registration column
 		Contact       string   `json:"contact,omitempty"`     // SIP registration column
 		Expires       string   `json:"expires,omitempty"`     // SIP registration column
 		CseqMethod    string   `json:"cseq_method,omitempty"` // SIP call column cseq_method
@@ -2909,12 +2938,20 @@ func buildSearchSQLV4WithOpts(lakeName string, req *SearchObjectV4, virtualRules
 			capStr, capStr, capStr))
 	}
 	// node / node_id: match numeric column or HEP hostname in data_extra (#922).
-	nodeFilter := firstNonEmpty(req.Filter.Node, req.Filter.NodeID)
-	if nodeFilter != "" {
-		ns := sqlvalidator.SafeString(nodeFilter)
-		conditions = append(conditions, fmt.Sprintf(
-			"(node_id = '%s' OR json_extract_string(data_extra, '$.node_name') = '%s')",
-			ns, ns))
+	nodeValues := searchFilterStringValues(
+		firstNonEmpty(req.Filter.Node, req.Filter.NodeID),
+		req.Filter.Nodes,
+		req.Filter.NodeIDs,
+	)
+	if len(nodeValues) > 0 {
+		parts := make([]string, 0, len(nodeValues))
+		for _, node := range nodeValues {
+			ns := sqlvalidator.SafeString(node)
+			parts = append(parts, fmt.Sprintf(
+				"(node_id = '%s' OR json_extract_string(data_extra, '$.node_name') = '%s')",
+				ns, ns))
+		}
+		conditions = append(conditions, fmt.Sprintf("(%s)", strings.Join(parts, " OR ")))
 	}
 	if nn := strings.TrimSpace(req.Filter.NodeName); nn != "" {
 		conditions = append(conditions, sqlFormMatchClause(
