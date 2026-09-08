@@ -1,11 +1,11 @@
 name: Docker GHCR publish
 
 on:
+  push:
+    branches:
+      - scb
   workflow_dispatch:
     inputs:
-      ref_name:
-        description: Release version tag (e.g. v1.2.3)
-        required: true
       release:
         description: Push images to GHCR
         required: false
@@ -16,7 +16,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  IMAGE_NAME: talha-ak/scb-homer
 
 jobs:
   build:
@@ -34,9 +34,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-    env:
-      VERSION: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.ref_name || github.ref_name }}
-
     steps:
       - uses: actions/checkout@v5
 
@@ -54,18 +51,18 @@ jobs:
           context: .
           file: Dockerfile
           platforms: ${{ matrix.platform }}
-          outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},name-canonical=true,push-by-digest=true,push=${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.release) || github.event_name == 'release' }}
+          outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},name-canonical=true,push-by-digest=true,push=${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.release) || github.event_name == 'release' }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Export image digest
-        if: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.release) || github.event_name == 'release' }}
+        if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.release) || github.event_name == 'release' }}
         run: printf '%s' "${{ steps.build.outputs.digest }}" > digest.txt
 
       - uses: actions/upload-artifact@v6
-        if: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.release) || github.event_name == 'release' }}
+        if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.release) || github.event_name == 'release' }}
         with:
           name: digest-${{ matrix.key }}
           path: digest.txt
@@ -73,13 +70,10 @@ jobs:
   merge:
     needs: build
     runs-on: ubuntu-latest
-    if: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.release) || github.event_name == 'release' }}
+    if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.release) || github.event_name == 'release' }}
     permissions:
       contents: read
       packages: write
-    env:
-      VERSION: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.ref_name || github.ref_name }}
-
     steps:
       - uses: docker/login-action@v3
         with:
@@ -102,14 +96,9 @@ jobs:
       - name: Publish multi-arch tags
         run: |
           IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
-          VERSION="${{ env.VERSION }}"
           AMD64_DIGEST=$(cat digests/amd64/digest.txt)
           ARM64_DIGEST=$(cat digests/arm64/digest.txt)
           docker buildx imagetools create \
             --tag "${IMAGE}:latest" \
-            "${IMAGE}@${AMD64_DIGEST}" \
-            "${IMAGE}@${ARM64_DIGEST}"
-          docker buildx imagetools create \
-            --tag "${IMAGE}:${VERSION}" \
             "${IMAGE}@${AMD64_DIGEST}" \
             "${IMAGE}@${ARM64_DIGEST}"
